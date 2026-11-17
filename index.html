@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly planner</title>
+<link rel="icon" href="/icon.png" sizes="128x128" type="image/png">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  :root {
+    --bg: #f7f6f3; --card: #ffffff; --ink: #1f1d1a; --muted: #77736c;
+    --line: #e4e0d8; --accent: #2f6f4f; --accent-soft: #e6f0ea; --warn: #9a5516;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #181716; --card: #21201e; --ink: #ecebe7; --muted: #9a968e;
+      --line: #35332f; --accent: #7fc29f; --accent-soft: #22322a; --warn: #e0a05c;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+
+  header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  h1 { font-size: 22px; margin: 0; flex: 1 1 auto; letter-spacing: -0.01em; }
+  button {
+    font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  #search {
+    width: 100%; font: inherit; color: inherit; background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+  }
+  #search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #search::placeholder { color: var(--muted); opacity: 0.8; }
+  #status { color: var(--muted); font-size: 13px; min-height: 20px; margin: 4px 0 8px; }
+  #status.warn { color: var(--warn); }
+
+  #checkin {
+    background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 16px;
+  }
+
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  section.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  h2 { font-size: 15px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  h2 .date { color: var(--muted); font-weight: 400; font-size: 13px; }
+  h2 .badge { color: var(--accent); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .item { display: flex; align-items: flex-start; gap: 8px; border-radius: 4px; }
+  .item input[type=checkbox] { margin: 7px 0 0; width: 15px; height: 15px; accent-color: var(--accent); flex: none; }
+  .item.empty input[type=checkbox], .item.empty .dot { visibility: hidden; }
+  .item.sub { margin-left: 23px; }
+  textarea {
+    font: inherit; color: inherit; background: transparent; border: 0; outline: 0; resize: none;
+    width: 100%; padding: 3px 4px; border-radius: 4px; overflow: hidden; field-sizing: content;
+  }
+  textarea:focus { background: var(--bg); }
+  textarea::placeholder { color: var(--muted); opacity: 0.7; }
+  .item.done textarea { color: var(--muted); text-decoration: line-through; }
+
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .summary { grid-template-columns: 1fr; } }
+  .summary h3 { font-size: 13px; margin: 0 0 4px; color: var(--muted); font-weight: 600; }
+  .summary ul { margin: 0; padding-left: 18px; }
+  .summary .none { color: var(--muted); font-size: 13px; }
+  .summary .progress { color: var(--muted); font-size: 13px; margin-left: 6px; white-space: nowrap; }
+  /* Own summary lines sit under the generated bullets and line up with them. */
+  .summary .item { gap: 0; }
+  .summary .item textarea { padding-top: 0; padding-bottom: 0; }
+  .summary .dot { flex: none; width: 14px; margin-left: -3px; margin-right: 3px; font-size: 20px; line-height: 22px; text-align: center; }
+  #notes { min-height: 72px; border: 1px solid var(--line); padding: 8px; overflow: auto; }
+  .hint { color: var(--muted); font-size: 12px; margin: 16px 0 0; }
+
+  #results .count { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .hit {
+    display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left;
+    border: 0; background: transparent; padding: 4px 6px; border-radius: 4px;
+  }
+  .hit:hover, .hit:focus-visible { background: var(--bg); }
+  .hit .tick { flex: none; width: 14px; color: var(--muted); }
+  .hit .text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .hit .where { flex: none; color: var(--muted); font-size: 13px; }
+  .hit .parent { color: var(--muted); }
+  mark { background: var(--accent-soft); color: inherit; border-radius: 2px; box-shadow: 0 0 0 1px var(--accent-soft); }
+  .flash { animation: flash 2s ease-out; }
+  @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Weekly planner</h1>
+    <button id="prev" title="Previous week">←</button>
+    <button id="now">This week</button>
+    <button id="next" title="Next week">→</button>
+  </header>
+  <input id="search" type="search" placeholder="Search all weeks…  ( / )" autocomplete="off" aria-label="Search all weeks">
+  <div id="status"></div>
+
+  <div id="results" hidden></div>
+
+  <div id="week">
+    <div id="checkin" hidden>4pm check-in: tick off what is done and add what is not finished yet.</div>
+
+    <div id="days"></div>
+
+    <section id="summary-card">
+      <h2>Weekly summary <span class="date" id="counts"></span></h2>
+      <div class="summary">
+        <div><h3>Finished</h3><div id="finished"></div><div id="own-finished"></div></div>
+        <div><h3>Not finished</h3><div id="unfinished"></div><div id="own-unfinished"></div></div>
+      </div>
+    </section>
+
+    <section id="notes-card">
+      <h2>Notes</h2>
+      <textarea id="notes" placeholder="Anything else about this week…"></textarea>
+    </section>
+
+    <p class="hint">Enter adds an item, Tab makes it a sub-item of the one above (Shift+Tab undoes that), Backspace on an empty item removes it. The summary lists come from the checkboxes; add your own lines under them. Saved automatically to <code>data/&lt;week&gt;.md</code>.</p>
+  </div>
+</main>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+};
+const autoSize = !CSS.supports('field-sizing', 'content');
+const checkin = new URLSearchParams(location.search).has('checkin');
+const KINDS = ['finished', 'unfinished'];
+
+let state = null;     // the week as loaded from the server, edited in place
+let dirty = false;    // there are edits the server has not seen
+let saving = false;
+let timer = null;
+
+function status(text, warn) {
+  $('#status').textContent = text;
+  $('#status').classList.toggle('warn', !!warn);
+}
+
+function grow(area) {
+  if (!autoSize) return;
+  area.style.height = 'auto';
+  area.style.height = area.scrollHeight + 'px';
+}
+const growAll = () => document.querySelectorAll('textarea').forEach(grow);
+
+function shortDate(iso, weekday) {
+  const options = { month: 'short', day: 'numeric' };
+  if (weekday) options.weekday = 'short';
+  return new Date(iso + 'T00:00').toLocaleDateString(undefined, options);
+}
+
+// ---------- the week ----------
+
+function render() {
+  $('#title').textContent = state.label;
+  $('#now').hidden = state.week === state.current;
+  const box = $('#days');
+  box.textContent = '';
+  for (const day of state.days) {
+    const isToday = day.date === state.today;
+    const section = el('section', isToday ? 'today' : '');
+    const head = el('h2', '', day.name);
+    head.append(el('span', 'date', shortDate(day.date)));
+    if (isToday) head.append(el('span', 'badge', 'Today'));
+    day.list = el('div');
+    day.section = section;
+    fillList(day);
+    section.append(head, day.list);
+    box.append(section);
+  }
+  // The user's own summary lines: same editable rows as a day, without checkboxes.
+  state.own = {};
+  for (const kind of KINDS) {
+    const group = {
+      plain: true,
+      list: $('#own-' + kind),
+      items: state.summary[kind].map((text) => blank(text)),
+    };
+    group.list.textContent = '';
+    fillList(group);
+    state.own[kind] = group;
+  }
+  $('#notes').value = state.notes;
+  growAll();
+  renderSummary();
+}
+
+// A group is a day or one of the own-summary lists: { items, list, plain? }.
+// Its items are a flat list; depth 1 marks a sub-item of the nearest depth-0 item above.
+const blank = (text = '', depth = 0) => ({ text, done: false, depth });
+
+function fillList(group) {
+  group.items.push(blank());   // every list ends with a blank row to type into
+  for (const item of group.items) group.list.append(row(group, item));
+}
+
+function paint(item) {
+  item.node.classList.toggle('done', !!item.done);
+  item.node.classList.toggle('empty', !item.text.trim());
+  item.node.classList.toggle('sub', !!item.depth);
+}
+
+function setDepth(item, depth) {
+  if (item.depth === depth) return;
+  item.depth = depth;
+  paint(item);
+  if (item.text.trim()) changed();
+}
+
+function row(group, item) {
+  const node = el('div', 'item');
+  let lead;
+  if (group.plain) {
+    lead = el('span', 'dot', '•');
+  } else {
+    lead = el('input');
+    lead.type = 'checkbox';
+    lead.checked = item.done;
+    lead.onchange = () => { item.done = lead.checked; paint(item); changed(); };
+  }
+  const area = el('textarea');
+  area.rows = 1;
+  area.value = item.text;
+  area.placeholder = group.plain ? 'Add your own…' : 'Add an item…';
+  item.area = area;
+  item.node = node;
+  paint(item);
+
+  area.oninput = () => {
+    if (area.value.includes('\n')) area.value = area.value.replace(/\s*\n\s*/g, ' ');
+    item.text = area.value;
+    paint(item);
+    grow(area);
+    const last = group.items[group.items.length - 1];
+    if (last.text.trim()) {
+      const extra = blank();
+      group.items.push(extra);
+      group.list.append(row(group, extra));
+    }
+    changed();
+  };
+
+  area.onkeydown = (event) => {
+    const index = group.items.indexOf(item);
+    const plainKey = !event.metaKey && !event.ctrlKey && !event.altKey;
+    if (event.key === 'Tab' && !group.plain && plainKey) {
+      // Tab indents under the item above, Shift+Tab moves back out. When there is
+      // nothing to do (first row, or Shift+Tab on a top-level row) Tab moves focus as usual.
+      if (event.shiftKey ? item.depth : index > 0) {
+        event.preventDefault();
+        setDepth(item, event.shiftKey ? 0 : 1);
+      }
+    } else if (event.key === 'Enter' && !event.isComposing) {
+      event.preventDefault();
+      if (!item.text.trim()) return setDepth(item, 0);   // Enter on an empty sub-item ends the sub-list
+      let next = group.items[index + 1];
+      // Enter on an item that already has sub-items starts a new first sub-item.
+      const depth = next && next.text.trim() && next.depth ? 1 : item.depth;
+      if (!next || next.text.trim()) {
+        next = blank('', depth);
+        group.items.splice(index + 1, 0, next);
+        node.after(row(group, next));
+      } else {
+        next.depth = depth;
+        paint(next);
+      }
+      next.area.focus();
+    } else if (event.key === 'Backspace' && area.value === '') {
+      event.preventDefault();
+      if (item.depth) return setDepth(item, 0);   // first Backspace moves an empty sub-item back out
+      const isLast = index === group.items.length - 1;
+      if (!isLast) {
+        group.items.splice(index, 1);
+        node.remove();
+        if (group.items[0].depth) { group.items[0].depth = 0; paint(group.items[0]); }   // no orphan sub-items
+        changed();
+      }
+      const target = group.items[index - 1] || (isLast ? null : group.items[index]);
+      if (target) target.area.focus();
+    } else if (event.key === 'ArrowUp' && group.items[index - 1]) {
+      event.preventDefault();
+      group.items[index - 1].area.focus();
+    } else if (event.key === 'ArrowDown' && group.items[index + 1]) {
+      event.preventDefault();
+      group.items[index + 1].area.focus();
+    }
+  };
+
+  node.append(lead, area);
+  return node;
+}
+
+const texts = (group) => group.items.map((item) => item.text.trim()).filter(Boolean);
+
+// The generated half of the summary: top-level items merged by text across the week,
+// finished if ticked on any day, with their sub-items merged the same way. This mirrors
+// summarize() in planner.py, which writes the same lists to the file.
+function renderSummary() {
+  const merge = (into, item) => {
+    const text = item.text.trim();
+    const key = text.toLowerCase().split(/\s+/).join(' ');
+    if (!into.has(key)) into.set(key, { text, done: false, subs: new Map() });
+    const entry = into.get(key);
+    if (item.done) entry.done = true;
+    return entry;
+  };
+  const seen = new Map();
+  for (const day of state.days) {
+    let parent = null;
+    for (const item of day.items) {
+      if (!item.text.trim()) continue;
+      if (item.depth && parent) merge(parent.subs, item);
+      else parent = merge(seen, item);
+    }
+  }
+  const all = [...seen.values()];
+  const lists = { finished: all.filter((i) => i.done), unfinished: all.filter((i) => !i.done) };
+  const emptyText = { finished: 'Nothing ticked off yet.', unfinished: 'Nothing open.' };
+  const totals = {};
+  for (const kind of KINDS) {
+    const own = texts(state.own[kind]).length;
+    totals[kind] = lists[kind].length + own;
+    const box = $('#' + kind);
+    box.textContent = '';
+    if (lists[kind].length) {
+      const list = el('ul');
+      for (const entry of lists[kind]) {
+        const line = el('li', '', entry.text);
+        const subs = [...entry.subs.values()];
+        if (subs.length) {
+          const done = subs.filter((sub) => sub.done).length;
+          const progress = el('span', 'progress', done + '/' + subs.length);
+          progress.title = done + ' of ' + subs.length + ' sub-items finished';
+          line.append(progress);
+          const open = subs.filter((sub) => !sub.done);
+          if (kind === 'unfinished' && open.length) {
+            const nested = el('ul');
+            for (const sub of open) nested.append(el('li', '', sub.text));
+            line.append(nested);
+          }
+        }
+        list.append(line);
+      }
+      box.append(list);
+    } else if (!own) {
+      box.append(el('div', 'none', emptyText[kind]));
+    }
+  }
+  $('#counts').textContent = totals.finished + totals.unfinished
+    ? totals.finished + ' finished · ' + totals.unfinished + ' open' : '';
+}
+
+// ---------- loading and saving ----------
+
+function payload() {
+  const days = {};
+  for (const day of state.days) {
+    days[day.name] = day.items
+      .filter((item) => item.text.trim())
+      .map((item) => ({ text: item.text.trim(), done: item.done, depth: item.depth }));
+  }
+  const summary = { finished: texts(state.own.finished), unfinished: texts(state.own.unfinished) };
+  return JSON.stringify({ mtime: state.mtime, notes: state.notes, days, summary });
+}
+
+function changed() {
+  dirty = true;
+  renderSummary();
+  status('Saving…');
+  clearTimeout(timer);
+  timer = setTimeout(save, 500);
+}
+
+async function save() {
+  clearTimeout(timer);
+  if (saving) { timer = setTimeout(save, 200); return; }
+  saving = true;
+  dirty = false;
+  const week = state.week;
+  try {
+    const response = await fetch('/api/week/' + week, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload(),
+    });
+    if (response.status === 409) {
+      // Someone (an agent, an editor) changed the file since we loaded it: their version wins.
+      state = await response.json();
+      dirty = false;
+      render();
+      status('The file changed on disk, so the page was reloaded from it. Redo your last edit.', true);
+    } else if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    } else {
+      const result = await response.json();
+      if (state.week === week) state.mtime = result.mtime;
+      if (!dirty) status('Saved');
+    }
+  } catch (error) {
+    dirty = true;
+    status('Not saved (' + error.message + '). Retrying…', true);
+    timer = setTimeout(save, 3000);
+  } finally {
+    saving = false;
+  }
+}
+
+async function load(week) {
+  if (dirty) await save();
+  try {
+    const response = await fetch('/api/week/' + week);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    state = await response.json();
+    render();
+    status('');
+  } catch (error) {
+    status('Could not load the week (' + error.message + '). Is the planner server running?', true);
+  }
+}
+
+// Pick up edits made to the file while the page sat in the background.
+async function refresh() {
+  if (!state || document.hidden || dirty || saving) return;
+  try {
+    const fresh = await (await fetch('/api/week/' + state.week)).json();
+    if (dirty || saving) return;
+    if (fresh.mtime !== state.mtime || fresh.today !== state.today) { state = fresh; render(); }
+  } catch (error) { /* server not reachable; the next save will say so */ }
+}
+
+// ---------- search ----------
+
+let searchTimer = null;
+let searchRun = 0;
+
+function showWeek(visible) {
+  $('#week').hidden = !visible;
+  $('#results').hidden = visible;
+  if (visible) growAll();
+}
+
+async function runSearch() {
+  const query = $('#search').value.trim();
+  const run = ++searchRun;
+  if (!query) return showWeek(true);
+  if (dirty) await save();   // so the search sees what was just typed
+  try {
+    const response = await fetch('/api/search?q=' + encodeURIComponent(query));
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const found = await response.json();
+    if (run !== searchRun) return;   // a newer search is already on its way
+    renderResults(found, query);
+    showWeek(false);
+  } catch (error) {
+    status('Search failed (' + error.message + ').', true);
+  }
+}
+
+function highlight(text, words) {
+  const escaped = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const parts = text.split(new RegExp('(' + escaped.join('|') + ')', 'gi'));
+  const out = document.createDocumentFragment();
+  parts.forEach((part, i) => out.append(i % 2 ? el('mark', '', part) : part));
+  return out;
+}
+
+function renderResults(found, query) {
+  const box = $('#results');
+  box.textContent = '';
+  const hits = found.results;
+  if (!hits.length) {
+    box.append(el('p', 'count', 'Nothing found for “' + query + '”.'));
+    return;
+  }
+  const weeks = new Map();
+  for (const hit of hits) {
+    if (!weeks.has(hit.week)) weeks.set(hit.week, []);
+    weeks.get(hit.week).push(hit);
+  }
+  const count = hits.length + (hits.length === 1 ? ' match in ' : ' matches in ')
+    + weeks.size + (weeks.size === 1 ? ' week' : ' weeks')
+    + (found.truncated ? '. Showing the newest ' + hits.length + '; narrow the search to see older ones.' : '');
+  box.append(el('p', 'count', count));
+  const words = query.split(/\s+/);
+  for (const group of weeks.values()) {
+    const section = el('section');
+    section.append(el('h2', '', group[0].label));
+    for (const hit of group) {
+      const button = el('button', 'hit');
+      const text = el('span', 'text');
+      if (hit.parent) text.append(el('span', 'parent', hit.parent + ' › '));
+      text.append(highlight(hit.text, words));
+      const tick = hit.done === true ? '✓' : hit.done === false ? '○' : '';
+      const where = hit.date ? shortDate(hit.date, true) : hit.where;
+      button.append(el('span', 'tick', tick), text, el('span', 'where', where));
+      button.title = hit.done === true ? 'Finished' : hit.done === false ? 'Not finished' : '';
+      button.onclick = () => openHit(hit);
+      section.append(button);
+    }
+    box.append(section);
+  }
+}
+
+// Jump from a search result to its week and flash the matching line.
+async function openHit(hit) {
+  $('#search').value = '';
+  searchRun++;
+  showWeek(true);
+  await load(hit.week);
+  if (!state || state.week !== hit.week) return;
+  const day = state.days.find((d) => d.date === hit.date);
+  let target = $('#notes-card');
+  if (day) {
+    // For a sub-item, pick the one under the right parent.
+    let parent = null;
+    const item = day.items.find((i) => {
+      if (!i.depth) parent = i.text;
+      return i.text === hit.text && (hit.parent ? !!i.depth && parent === hit.parent : !i.depth);
+    }) || day.items.find((i) => i.text === hit.text);
+    target = item ? item.node : day.section;
+  } else if (hit.where === 'Summary') {
+    const item = KINDS.flatMap((kind) => state.own[kind].items).find((i) => i.text === hit.text);
+    target = item ? item.node : $('#summary-card');
+  }
+  target.scrollIntoView({ block: 'center' });
+  target.classList.add('flash');
+  setTimeout(() => target.classList.remove('flash'), 2000);
+}
+
+$('#search').oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 150);
+};
+$('#search').onkeydown = (event) => {
+  if (event.key === 'Escape') { $('#search').value = ''; $('#search').blur(); runSearch(); }
+};
+document.addEventListener('keydown', (event) => {
+  const typing = /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName);
+  if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    $('#search').focus();
+  }
+});
+
+// ---------- wiring ----------
+
+const leaveSearch = () => { $('#search').value = ''; searchRun++; showWeek(true); };
+$('#prev').onclick = () => { leaveSearch(); load(state.prev); };
+$('#next').onclick = () => { leaveSearch(); load(state.next); };
+$('#now').onclick = () => { leaveSearch(); load('current'); };
+$('#notes').oninput = () => { state.notes = $('#notes').value; changed(); };
+document.addEventListener('visibilitychange', refresh);
+window.addEventListener('focus', refresh);
+window.addEventListener('resize', growAll);
+window.addEventListener('pagehide', () => {
+  if (dirty && state) {
+    navigator.sendBeacon('/api/week/' + state.week, new Blob([payload()], { type: 'application/json' }));
+  }
+});
+
+load('current').then(() => {
+  if (!checkin || !state) return;
+  $('#checkin').hidden = false;
+  const today = state.days.find((day) => day.date === state.today);
+  if (today) {
+    today.section.scrollIntoView({ block: 'center' });
+    today.items[today.items.length - 1].area.focus();
+  }
+});
+</script>
+</body>
+</html>

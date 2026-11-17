@@ -1,0 +1,4 @@
+data/
+planner.log
+__pycache__/
+.DS_Store
